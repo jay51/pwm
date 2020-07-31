@@ -1,0 +1,62 @@
+#!/bin/bash
+set -e # exit whenever we encounter error
+set -x # echo every cammand
+
+
+STORAGE=${HOME}/.passwd
+# echo wordtodec | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:password
+# echo U2FsdGVkX18pJtWiMNj8socY8QL | openssl enc -aes-256-cbc -a -pbkdf2 -d -pass pass:password
+# ANSWER=$(zenity --entry --title "PASSWORD" --text "Please enter your name:" --ok-label "save" --width=400 --height=100)
+
+MAINPASS=$(zenity --password --title "PASSWORD")
+if [ -s "$STORAGE" ]; then
+    LINE1PASSWORD=$(head -n1 $STORAGE | cut -d"," -f2)
+
+    if ! echo "$LINE1PASSWORD" | openssl enc -aes-256-cbc -a -pbkdf2 -d -pass pass:$MAINPASS; then
+          zenity --notification\
+            --text="WRONG PASSWORD!"
+        exit
+    fi
+
+fi
+
+if [ "$1" == "-a" ]; then
+    ANSWER=$(zenity --forms --title="Add password"\
+            --text="Enter information." \
+            --separator="," \
+            --add-entry="Name" \
+            --add-password="Password")
+
+    NAME=$(echo $ANSWER | cut -d"," -f1)
+    PASSWORD=$(echo $ANSWER | cut -d"," -f2 | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:$MAINPASS)
+    # echo $NAME
+    # echo $PASSWORD
+    echo "$NAME,$PASSWORD" >> $STORAGE
+fi
+
+if [ "$1" == "-l" ]; then
+    DATA=""
+    for line in $(cat $STORAGE); do
+        # DATA+=$(echo $line | awk -F, '{print $1, $2, " "}')
+        NAME=$(echo $line | cut -d"," -f1)
+        PASS=$(echo $line | cut -d"," -f2 | openssl enc -aes-256-cbc -a -pbkdf2 -d -pass pass:$MAINPASS)
+        DATA+="$NAME $PASS "
+    done
+
+    zenity --list \
+      --title="Choose the Bugs You Wish to View" \
+      --column="NAME" --column="PASSWORD" \
+      --width=500 --height=200 \
+      $DATA
+fi
+
+
+
+if [ $# -eq 0 ]
+  then
+    ANSWER=$(zenity --forms --title="Add password"\
+            --text="Enter information." \
+            --separator="," \
+            --add-entry="Name")
+    # search file for name and display only that name and password
+fi
