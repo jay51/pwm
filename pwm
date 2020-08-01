@@ -3,22 +3,59 @@ set -e # exit whenever we encounter error
 set -x # echo every cammand
 
 
-STORAGE=${HOME}/.passwd
 # echo wordtodec | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:password
 # echo U2FsdGVkX18pJtWiMNj8socY8QL | openssl enc -aes-256-cbc -a -pbkdf2 -d -pass pass:password
-# ANSWER=$(zenity --entry --title "PASSWORD" --text "Please enter your name:" --ok-label "save" --width=400 --height=100)
-
+STORAGE=${HOME}/.passwd
 MAINPASS=$(zenity --password --title "PASSWORD")
+
 if [ -s "$STORAGE" ]; then
     LINE1PASSWORD=$(head -n1 $STORAGE | cut -d"," -f2)
 
-    if ! echo "$LINE1PASSWORD" | openssl enc -aes-256-cbc -a -pbkdf2 -d -pass pass:$MAINPASS; then
+    if [ -z "$MAINPASS" ]; then
+        zenity --notification \
+            --text="WRONG PASSWORD!"
+        exit 1
+    fi
+
+    if ! echo "$LINE1PASSWORD" | openssl enc -aes-256-cbc -a -pbkdf2 -d -pass pass:$MAINPASS &>/dev/null; then
           zenity --notification\
             --text="WRONG PASSWORD!"
-        exit
+        exit 1
     fi
 
 fi
+
+
+if [ $# -eq 0 ]
+  then
+    ANSWER=$(zenity --forms --title="search for website"\
+            --text="Enter information." \
+            --separator="," \
+            --add-entry="Name")
+
+
+    if [ -z "$ANSWER" ]; then
+          zenity --notification\
+            --text="NO WEBSITE WAS ENTERED!"
+        exit 1
+    fi
+
+    DATA=""
+    for line in $(cat $STORAGE); do
+        if echo $line | cut -d"," -f1 | grep $ANSWER; then
+            NAME=$(echo $line | cut -d"," -f1)
+            PASS=$(echo $line | cut -d"," -f2 | openssl enc -aes-256-cbc -a -pbkdf2 -d -pass pass:$MAINPASS)
+            DATA+="$NAME $PASS "
+        fi
+    done
+
+    zenity --list \
+      --title="Choose the Bugs You Wish to View" \
+      --column="NAME" --column="PASSWORD" \
+      --width=500 --height=200 \
+      $DATA
+fi
+
 
 if [ "$1" == "-a" ]; then
     ANSWER=$(zenity --forms --title="Add password"\
@@ -27,12 +64,19 @@ if [ "$1" == "-a" ]; then
             --add-entry="Name" \
             --add-password="Password")
 
+
     NAME=$(echo $ANSWER | cut -d"," -f1)
+    PASSWORD=$(echo $ANSWER | cut -d"," -f2)
+    if [[ -z "$NAME" || -z "$PASSWORD" ]]; then
+          zenity --notification\
+            --text="NO NAME OR PASSWORD WAS ENTERED!"
+        exit 1
+    fi
+
     PASSWORD=$(echo $ANSWER | cut -d"," -f2 | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:$MAINPASS)
-    # echo $NAME
-    # echo $PASSWORD
     echo "$NAME,$PASSWORD" >> $STORAGE
 fi
+
 
 if [ "$1" == "-l" ]; then
     DATA=""
@@ -50,13 +94,3 @@ if [ "$1" == "-l" ]; then
       $DATA
 fi
 
-
-
-if [ $# -eq 0 ]
-  then
-    ANSWER=$(zenity --forms --title="Add password"\
-            --text="Enter information." \
-            --separator="," \
-            --add-entry="Name")
-    # search file for name and display only that name and password
-fi
